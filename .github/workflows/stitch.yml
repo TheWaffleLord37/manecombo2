@@ -1,0 +1,48 @@
+name: Stitch Combo Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/_READY.txt'  # Trigger on any READY file anywhere
+
+jobs:
+  stitch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Pillow
+        run: pip install pillow
+
+      - name: Find READY folder
+        id: folder
+        run: |
+          # Look for any READY file in the repo
+          READY_FILE=$(find . -name "*_READY.txt" | head -n1)
+          if [ -z "$READY_FILE" ]; then
+            echo "No READY file found, exiting."
+            exit 0
+          fi
+          CHUNK_DIR=$(dirname "$READY_FILE")
+          echo "CHUNK_DIR=$CHUNK_DIR" >> $GITHUB_ENV
+          echo "Found READY folder: $CHUNK_DIR"
+
+      - name: Stitch chunks
+        run: |
+          python .github/scripts/stitch.py "$CHUNK_DIR"
+
+      - name: Commit stitched image and clean up
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add combo/
+          git rm -rf "$CHUNK_DIR"
+          git commit -m "Stitched combo from chunks [skip ci]" || echo "No changes"
+          git push
